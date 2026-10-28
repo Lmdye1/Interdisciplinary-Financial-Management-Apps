@@ -38,7 +38,7 @@
 <div class="metric"><span>必要な総量</span><strong id="volume">—</strong></div>
 <div class="metric"><span>目標販売ペース</span><strong id="pace">—</strong></div>
 </div><div id="message" class="notice" aria-live="polite"></div>
-<button id="print">印刷／PDF保存</button><button id="clear" class="secondary">入力をリセット</button>
+<button id="exportJson">JSONファイルに保存</button><button id="importJson" class="secondary">JSONファイルを読み込む</button><input id="jsonFile" type="file" accept=".json,application/json" hidden><button id="print">印刷／PDF保存</button><button id="clear" class="secondary">入力をリセット</button>
 </section>
 <p class="hint">対応単位：重量（g・kg）、液体（mL・L）、個数（個・本・袋・セットなど）。個数系の単位は同じ単位同士で計算します。保存データはこの端末・ブラウザー内のみで、他の端末とは共有されません。</p>
 </main>
@@ -88,5 +88,41 @@ function load(){try{const s=JSON.parse(localStorage.getItem('gakusaiBudgetAppV2'
 $('add').addEventListener('click',()=>{addRow();calculate()});
 $('sample').addEventListener('click',()=>{localStorage.removeItem('gakusaiBudgetAppV2');$('materials').innerHTML='';defaults.forEach(r=>addRow(r));calculate()});
 $('clear').addEventListener('click',()=>{if(!confirm('入力内容をリセットしますか？'))return;localStorage.removeItem('gakusaiBudgetAppV2');['price','cups','serving','hours','budget','other','waste'].forEach((id,i)=>$(id).value=[300,120,150,6,15000,0,10][i]);$('materials').innerHTML='';defaults.forEach(r=>addRow(r));calculate()});
+
+function exportJson(){
+ const payload={app:'gakusai-budget-calculator',version:1,exportedAt:new Date().toISOString(),fields:['price','cups','serving','hours','budget','other','waste'].reduce((o,id)=>(o[id]=$(id).value,o),{}),materials:rows()};
+ const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');
+ const d=new Date(),stamp=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('');
+ a.href=url;a.download='gakusai-budget-'+stamp+'.json';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+}
+function importJsonFile(file){
+ if(!file)return;
+ const reader=new FileReader();
+ reader.onload=()=>{
+  try{
+   const data=JSON.parse(String(reader.result||''));
+   if(!data||typeof data!=='object'||!data.fields||!Array.isArray(data.materials))throw new Error('必要なデータ（fields / materials）がありません。');
+   const allowed=['price','cups','serving','hours','budget','other','waste'];
+   for(const id of allowed){if(data.fields[id]!==undefined&&(!Number.isFinite(Number(data.fields[id]))||Number(data.fields[id])<0))throw new Error('条件データが不正です：'+id)}
+   for(const [idx,m] of data.materials.entries()){
+    if(!m||typeof m.name!=='string'||!Number.isFinite(Number(m.need))||Number(m.need)<0||!units.includes(m.unit)||!Number.isFinite(Number(m.pack))||Number(m.pack)<0||!units.includes(m.packUnit)||!Number.isFinite(Number(m.price))||Number(m.price)<0)throw new Error('材料データ '+(idx+1)+' 件目の形式が不正です。');
+   }
+   if(!confirm('現在の入力内容を、選択したJSONファイルの内容に置き換えますか？'))return;
+   allowed.forEach(id=>{if(data.fields[id]!==undefined)$(id).value=data.fields[id]});
+   $('materials').innerHTML='';
+   data.materials.forEach(m=>addRow({name:m.name,need:Number(m.need),unit:m.unit,pack:Number(m.pack),packUnit:m.packUnit,price:Number(m.price)}));
+   calculate();
+   $('message').textContent='JSONファイルを読み込み、入力内容を反映しました。';
+  }catch(e){alert('JSONファイルを読み込めませんでした。ファイル形式を確認してください。\\n'+e.message)}
+  finally{$('jsonFile').value=''}
+ };
+ reader.onerror=()=>{alert('ファイルを読み込めませんでした。');$('jsonFile').value=''};
+ reader.readAsText(file,'UTF-8');
+}
+$('exportJson').addEventListener('click',exportJson);
+$('importJson').addEventListener('click',()=>$('jsonFile').click());
+$('jsonFile').addEventListener('change',e=>importJsonFile(e.target.files&&e.target.files[0]));
+
 $('print').addEventListener('click',()=>window.print());['price','cups','serving','hours','budget','other','waste'].forEach(id=>$(id).addEventListener('input',calculate));load();calculate();
 </script></body></html>
