@@ -62,13 +62,13 @@ function addRow(item={name:'新しい材料',need:1,unit:'個',pack:1,packUnit:'
  tr.querySelector('.remove').addEventListener('click',()=>{tr.remove();calculate()});
  $('materials').appendChild(tr)
 }
-function factor(u){return ({g:1,kg:1000,mL:1,L:1000})[u]||null}
+function factor(u){return ({g:1,kg:1000,mL:1,L:1000})[u]||null}\nfunction dimension(u){return ['g','kg'].includes(u)?'mass':['mL','L'].includes(u)?'volume':'count'}
 function rows(){return [...$('materials').rows].map(r=>{const i=r.querySelectorAll('input'),s=r.querySelectorAll('select');return {name:i[0].value,need:Math.max(0,+i[1].value||0),unit:s[0].value,pack:Math.max(0,+i[2].value||0),packUnit:s[1].value,price:Math.max(0,+i[3].value||0)}})}
 function val(id){return Math.max(0,+$(id).value||0)}
 function calculate(){
  const data=rows();let material=0,invalid=[];
  data.forEach((r,idx)=>{
-  const sameDimension=(factor(r.unit)!==null&&factor(r.packUnit)!==null)||r.unit===r.packUnit;
+  const sameDimension=dimension(r.unit)===dimension(r.packUnit);
   const needBase=factor(r.unit)!==null&&factor(r.packUnit)!==null?r.need*factor(r.unit):r.need;
   const packBase=factor(r.unit)!==null&&factor(r.packUnit)!==null?r.pack*factor(r.packUnit):r.pack;
   const count=sameDimension&&packBase>0?Math.ceil(needBase/packBase):null;
