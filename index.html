@@ -12,6 +12,19 @@
 <body><main class="wrap">
 <h1>学際 予算・売上計算アプリ</h1>
 <p class="lead">材料の必要量と商品の購入単位・単価から、購入パック数と材料費合計を自動計算します。</p>
+
+<section class="panel"><h2>端末間のデータ共有（クラウド同期）</h2>
+<p class="hint">Supabaseを設定すると、同じアカウントでログインしたスマートフォン・PC間で入力内容を共有できます。最初にSupabaseのURLと公開用 anon keyを設定してください。</p>
+<div class="grid">
+<div><label for="cloudUrl">Supabase Project URL</label><input id="cloudUrl" type="url" placeholder="https://xxxx.supabase.co" autocomplete="url"></div>
+<div><label for="cloudKey">Supabase anon / publishable key</label><input id="cloudKey" type="password" placeholder="公開用キー" autocomplete="off"></div>
+<div><label for="cloudEmail">メールアドレス</label><input id="cloudEmail" type="email" autocomplete="username"></div>
+<div><label for="cloudPassword">パスワード</label><input id="cloudPassword" type="password" autocomplete="current-password"></div>
+</div>
+<button id="cloudConnect" type="button">接続設定を保存</button><button id="cloudLogin" type="button">ログイン</button><button id="cloudSignup" type="button" class="secondary">アカウント作成</button><button id="cloudLoad" type="button" class="secondary">クラウドから読み込む</button><button id="cloudSave" type="button" class="secondary">クラウドに保存</button><button id="cloudLogout" type="button" class="secondary">ログアウト</button>
+<div id="cloudStatus" class="notice" role="status" aria-live="polite">クラウド未設定：現在はこの端末内にのみ保存されます。</div>
+<p class="hint">Supabaseの設定値はこの端末のブラウザーに保存します。パスワードは保存しません。共有したい各端末で同じURL・公開用キーを設定し、同じアカウントでログインしてください。</p>
+</section>
 <section class="panel"><h2>販売・予算条件</h2><div class="grid">
 <div><label for="price">販売価格（円／杯）</label><input id="price" type="number" min="0" value="300"></div>
 <div><label for="cups">販売予定数（杯）</label><input id="cups" type="number" min="0" value="120"></div>
@@ -40,8 +53,9 @@
 </div><div id="message" class="notice" aria-live="polite"></div>
 <button id="print">印刷／PDF保存</button><button id="clear" class="secondary">入力をリセット</button>
 </section>
-<p class="hint">対応単位：重量（g・kg）、液体（mL・L）、個数（個・本・袋・セットなど）。個数系の単位は同じ単位同士で計算します。保存データはこの端末・ブラウザー内のみで、他の端末とは共有されません。</p>
+<p class="hint">対応単位：重量（g・kg）、液体（mL・L）、個数（個・本・袋・セットなど）。個数系の単位は同じ単位同士で計算します。クラウド同期を設定しない場合、保存データはこの端末・ブラウザー内のみです。端末間共有には「端末間のデータ共有」の設定が必要です。</p>
 </main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const $=id=>document.getElementById(id), yen=n=>Math.round(n).toLocaleString('ja-JP')+' 円';
 const units=['g','kg','mL','L','個','本','袋','セット'];
@@ -83,10 +97,26 @@ function calculate(){
  $('message').textContent=invalid.length?'単位または内容量を確認してください：'+invalid.join('、')+'。重量同士・液体同士は換算できます。個数系は必要量と購入単位を同じ単位にしてください。':diff<0?'予算を '+yen(-diff)+' 超過する見込みです。数量・単価・販売計画を見直してください。':profit<0?'予想では赤字です。販売価格・販売数・費用を見直してください。':'予算内の見込みです。購入数は必要量を満たすよう切り上げています。';
  save()
 }
-function save(){try{localStorage.setItem('gakusaiBudgetAppV2',JSON.stringify({fields:['price','cups','serving','hours','budget','other','waste'].reduce((o,id)=>(o[id]=$(id).value,o),{}),materials:rows()}))}catch(e){}}
+let cloudClient=null,cloudUser=null,cloudSaveTimer=null,applyingCloud=false;
+const cloudConfigKey='gakusaiCloudConfigV1';
+function snapshot(){return {fields:['price','cups','serving','hours','budget','other','waste'].reduce((o,id)=>(o[id]=$(id).value,o),{}),materials:rows()}}
+function save(){try{localStorage.setItem('gakusaiBudgetAppV2',JSON.stringify(snapshot()))}catch(e){}if(cloudUser&&!applyingCloud){clearTimeout(cloudSaveTimer);cloudSaveTimer=setTimeout(()=>saveCloudData(false),1200)}}
 function load(){try{const s=JSON.parse(localStorage.getItem('gakusaiBudgetAppV2'));if(s){Object.entries(s.fields||{}).forEach(([k,v])=>{if($(k))$(k).value=v});(s.materials||defaults).forEach(r=>addRow(r));return}}catch(e){}defaults.forEach(r=>addRow(r))}
+function cloudMessage(message){$('cloudStatus').textContent=message}
+function saveCloudConfig(){const url=$('cloudUrl').value.trim().replace(/\\/$/,'');const key=$('cloudKey').value.trim();if(!/^https:\/\/[a-zA-Z0-9.-]+$/.test(url)||!key){cloudMessage('Supabase URLまたは公開用キーが正しくありません。');return false}try{localStorage.setItem(cloudConfigKey,JSON.stringify({url,key}))}catch(e){}cloudClient=window.supabase.createClient(url,key);cloudMessage('接続設定を保存しました。メールアドレスとパスワードでログインしてください。');return true}
+async function saveCloudData(showStatus=true){if(!cloudClient||!cloudUser){if(showStatus)cloudMessage('先にSupabase設定を保存し、ログインしてください。');return}const {error}=await cloudClient.from('app_data').upsert({id:cloudUser.id,payload:snapshot(),updated_at:new Date().toISOString()});if(error){cloudMessage('クラウド保存エラー：'+error.message+'（READMEのテーブル・RLS設定を確認してください）');return}if(showStatus)cloudMessage('クラウドに保存しました。別端末でも同じアカウントで読み込めます。')}
+async function loadCloudData(){if(!cloudClient||!cloudUser){cloudMessage('先にSupabase設定を保存し、ログインしてください。');return}cloudMessage('クラウドから読み込み中…');const {data,error}=await cloudClient.from('app_data').select('payload,updated_at').eq('id',cloudUser.id).maybeSingle();if(error){cloudMessage('クラウド読み込みエラー：'+error.message+'（READMEのテーブル・RLS設定を確認してください）');return}if(!data){cloudMessage('クラウドに保存データがありません。現在の入力内容を初回データとして保存します。');await saveCloudData(true);return}applyingCloud=true;try{const p=data.payload||{};Object.entries(p.fields||{}).forEach(([k,v])=>{if($(k))$(k).value=v});$('materials').innerHTML='';(Array.isArray(p.materials)&&p.materials.length?p.materials:defaults).forEach(r=>addRow(r));calculate();localStorage.setItem('gakusaiBudgetAppV2',JSON.stringify(snapshot()));cloudMessage('クラウドから読み込みました。最終更新：'+(data.updated_at?new Date(data.updated_at).toLocaleString('ja-JP'):'日時不明'));}catch(e){cloudMessage('読み込みデータを反映できませんでした：'+e.message)}finally{applyingCloud=false}}
+function updateCloudUser(user){cloudUser=user||null;cloudMessage(cloudUser?'ログイン中：'+cloudUser.email+'。変更内容は自動保存されます。':'Supabase設定済み。メールアドレスとパスワードでログインしてください。')}
+async function initCloud(){try{const c=JSON.parse(localStorage.getItem(cloudConfigKey)||'null');if(!c)return;$('cloudUrl').value=c.url||'';$('cloudKey').value=c.key||'';cloudClient=window.supabase.createClient(c.url,c.key);const {data,error}=await cloudClient.auth.getSession();if(error){cloudMessage('セッション確認エラー：'+error.message);return}if(data.session){updateCloudUser(data.session.user);await loadCloudData()}else cloudMessage('Supabase設定済み。メールアドレスとパスワードでログインしてください。')}catch(e){cloudMessage('クラウド初期化エラー：'+e.message)}}
+$('cloudConnect').addEventListener('click',saveCloudConfig);
+$('cloudLogin').addEventListener('click',async()=>{if(!cloudClient&&!saveCloudConfig())return;if(!cloudClient)return;const {data,error}=await cloudClient.auth.signInWithPassword({email:$('cloudEmail').value.trim(),password:$('cloudPassword').value});if(error){cloudMessage('ログインできません：'+error.message);return}updateCloudUser(data.user);$('cloudPassword').value='';await loadCloudData()});
+$('cloudSignup').addEventListener('click',async()=>{if(!cloudClient&&!saveCloudConfig())return;if(!cloudClient)return;const {data,error}=await cloudClient.auth.signUp({email:$('cloudEmail').value.trim(),password:$('cloudPassword').value});if(error){cloudMessage('アカウント作成エラー：'+error.message);return}$('cloudPassword').value='';if(data.session){updateCloudUser(data.user);await loadCloudData()}else cloudMessage('確認メールを送信しました。メール内のリンクで確認後、ログインしてください。Supabaseのメール確認設定によっては確認が不要な場合もあります。')});
+$('cloudLoad').addEventListener('click',loadCloudData);
+$('cloudSave').addEventListener('click',()=>saveCloudData(true));
+$('cloudLogout').addEventListener('click',async()=>{if(!cloudClient)return;const {error}=await cloudClient.auth.signOut();if(error){cloudMessage('ログアウトエラー：'+error.message);return}updateCloudUser(null)});
+
 $('add').addEventListener('click',()=>{addRow();calculate()});
 $('sample').addEventListener('click',()=>{localStorage.removeItem('gakusaiBudgetAppV2');$('materials').innerHTML='';defaults.forEach(r=>addRow(r));calculate()});
 $('clear').addEventListener('click',()=>{if(!confirm('入力内容をリセットしますか？'))return;localStorage.removeItem('gakusaiBudgetAppV2');['price','cups','serving','hours','budget','other','waste'].forEach((id,i)=>$(id).value=[300,120,150,6,15000,0,10][i]);$('materials').innerHTML='';defaults.forEach(r=>addRow(r));calculate()});
-$('print').addEventListener('click',()=>window.print());['price','cups','serving','hours','budget','other','waste'].forEach(id=>$(id).addEventListener('input',calculate));load();calculate();
+$('print').addEventListener('click',()=>window.print());['price','cups','serving','hours','budget','other','waste'].forEach(id=>$(id).addEventListener('input',calculate));load();calculate();initCloud();
 </script></body></html>
