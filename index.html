@@ -3,44 +3,198 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#23395b">
 <title>学際 予算・売上計算アプリ</title>
 <style>
-:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#1f2937;background:#f3f6fa}*{box-sizing:border-box}body{margin:0;padding:20px}.wrap{max-width:1200px;margin:auto}h1{margin:0 0 8px;font-size:clamp(1.5rem,4vw,2.2rem)}.lead{color:#5b6472;margin:0 0 20px}.panel{background:white;border:1px solid #e1e6ee;border-radius:14px;padding:18px;margin:14px 0;box-shadow:0 3px 12px #182b4a0a}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}label{display:block;font-size:.9rem;font-weight:650;margin-bottom:5px}input,select{width:100%;padding:9px;border:1px solid #cbd3df;border-radius:8px;font:inherit}button{border:0;border-radius:8px;padding:10px 14px;font:inherit;font-weight:650;cursor:pointer;background:#245fc7;color:white;margin:5px 5px 0 0}button.secondary{background:#e8edf5;color:#26364d}button.danger{background:#a93434}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{padding:8px;border-bottom:1px solid #e8edf3;text-align:left;vertical-align:middle}th{font-size:.82rem;color:#586579}td input,td select{min-width:85px}.table-wrap{overflow-x:auto}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}.metric{background:#f5f8fc;border-radius:10px;padding:13px}.metric span{display:block;color:#667085;font-size:.85rem}.metric strong{display:block;font-size:1.35rem;margin-top:5px;overflow-wrap:anywhere}.good{color:#187347}.bad{color:#b42318}.hint{color:#667085;font-size:.88rem}.notice{padding:12px;border-radius:8px;background:#fff7e6;color:#805400;margin-top:12px}.formula{background:#f5f8fc;padding:12px;border-radius:8px;overflow-wrap:anywhere}@media(max-width:600px){body{padding:12px}.panel{padding:13px}th,td{padding:6px;font-size:.85rem}}
-@media print{body{background:white;padding:0}.panel{box-shadow:none;break-inside:avoid}button{display:none}input,select{border:0;padding:2px}.lead{margin-bottom:8px}}
+/* ===== デザイントークン（藍＝のれん、山吹＝差し色） ===== */
+:root{
+  --ai:#23395b;          /* 藍：見出し帯・主要な文字色 */
+  --ai-deep:#192a45;
+  --paper:#eef1f5;       /* ページ背景 */
+  --card:#fff;
+  --ink:#1b2430;
+  --muted:#5d6877;
+  --line:#d9dfe8;
+  --line-soft:#e8ecf2;
+  --yamabuki:#f0b429;    /* 山吹：主ボタン */
+  --yamabuki-deep:#d99b0c;
+  --good:#1b7f4f;
+  --bad:#b3261e;
+  font-family:system-ui,-apple-system,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Noto Sans JP",sans-serif;
+  color:var(--ink);
+  background:var(--paper);
+  line-height:1.6;
+}
+*{box-sizing:border-box}
+body{margin:0}
+
+/* ===== 見出しの帯 ===== */
+.site-head{background:var(--ai);color:#fff;padding:26px 0 56px}
+.site-head h1{margin:0 0 6px;font-size:clamp(1.45rem,4.2vw,2rem);letter-spacing:.02em;line-height:1.3}
+.lead{margin:0;max-width:60ch;color:rgba(255,255,255,.84)}
+
+/* ===== レイアウト ===== */
+.wrap{max-width:1200px;margin:0 auto;padding:0 20px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;margin-top:-28px;padding-bottom:40px}
+.inputs{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;min-width:0} /* 表の最小幅で列が押し広げられて結果欄に重ならないよう、列幅を明示 */
+.footnote{grid-column:1/-1;margin:0}
+@media (min-width:1200px){
+  .layout{grid-template-columns:minmax(0,1fr) 340px;align-items:start}
+  .result{position:sticky;top:16px}
+}
+
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:0 2px 10px #182b4a0d}
+h2{margin:0 0 12px;font-size:1.05rem;line-height:1.4}
+h2::before{content:"";display:inline-block;width:4px;height:1em;margin-right:8px;vertical-align:-.15em;border-radius:2px;background:var(--yamabuki)}
+.hint{margin:0 0 12px;max-width:72ch;color:var(--muted);font-size:.88rem}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap} /* 読み上げ専用の文字 */
+
+/* ===== 入力部品 ===== */
+label{display:block;margin-bottom:5px;font-size:.88rem;font-weight:650}
+input,select{width:100%;min-height:42px;padding:8px 10px;border:1px solid #c3ccd9;border-radius:8px;background:#fff;color:inherit;font:inherit}
+input:focus-visible,select:focus-visible{outline:3px solid #8fb0e6;outline-offset:0;border-color:var(--ai)}
+input[type=number]{-moz-appearance:textfield;appearance:textfield}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+/* 単位を入力欄の右に固定表示する */
+.with-unit{display:flex}
+.with-unit input{flex:1;min-width:0;border-radius:8px 0 0 8px}
+.with-unit .unit{display:flex;align-items:center;padding:0 10px;border:1px solid #c3ccd9;border-left:0;border-radius:0 8px 8px 0;background:#f1f4f8;color:var(--muted);font-size:.85rem;white-space:nowrap}
+
+/* ===== ボタン ===== */
+button{min-height:44px;padding:10px 16px;border:1px solid transparent;border-radius:8px;background:var(--ai);color:#fff;font:inherit;font-weight:650;cursor:pointer;transition:background-color .12s}
+button:hover{background:var(--ai-deep)}
+button:focus-visible{outline:3px solid var(--ai);outline-offset:2px}
+button.primary{background:var(--yamabuki);color:#2a2000}
+button.primary:hover{background:var(--yamabuki-deep)}
+button.secondary{background:#fff;color:var(--ai);border-color:#b9c4d6}
+button.secondary:hover{background:#f1f4f9}
+button.danger{background:#fff;color:var(--bad);border-color:#e6b9b5}
+button.danger:hover{background:#fdeceb}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+
+/* ===== 材料表（PC） ===== */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{padding:6px 4px 8px;border-bottom:2px solid var(--line);color:var(--muted);font-size:.78rem;font-weight:650;line-height:1.35;text-align:left;vertical-align:bottom}
+td{padding:6px 4px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
+tbody tr:focus-within{background:#f6f8fc}
+td input,td select{min-width:0;padding:7px 8px}
+td:nth-child(1) input{min-width:92px}
+td:nth-child(2) input,td:nth-child(4) input,td:nth-child(6) input{min-width:66px}
+td:nth-child(3) select,td:nth-child(5) select{min-width:68px}
+th:nth-child(7),th:nth-child(8),td.count,td.subtotal{text-align:right}
+td.count,td.subtotal{white-space:nowrap;font-variant-numeric:tabular-nums}
+td.subtotal{font-weight:700}
+td .remove{min-height:36px;padding:6px 10px;font-size:.85rem;white-space:nowrap}
+.empty-note{display:none;margin:12px 0 0;padding:14px;border:1px dashed #b9c4d6;border-radius:8px;color:var(--muted);text-align:center}
+.panel:has(#materials:empty) .empty-note{display:block}
+.formula{margin-top:14px;padding:10px 12px;border-left:4px solid var(--yamabuki);border-radius:0 8px 8px 0;background:#f5f8fc;font-size:.9rem;overflow-wrap:anywhere}
+
+/* ===== 計算結果（レシート風） ===== */
+.notice{margin:0 0 14px;padding:10px 12px;border-left:4px solid #8a97aa;border-radius:0 8px 8px 0;background:#eaeef4;color:#3b4757;font-size:.9rem}
+.notice[data-state=ok]{border-color:var(--good);background:#e6f4ec;color:#14532d}
+.notice[data-state=warn]{border-color:#c98a00;background:#fff4d6;color:#6b4700}
+.notice[data-state=bad]{border-color:var(--bad);background:#fdeceb;color:#7a1712}
+.lines{margin:0 0 12px}
+.metric{display:flex;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1px dashed var(--line)}
+.metric span{color:var(--muted);font-size:.88rem}
+.metric strong{margin-left:auto;text-align:right;font-size:1.05rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+/* 合計行：レシートの「合計」に当たる予想利益だけを大きく見せる */
+.metric.total{display:block;margin-top:6px;padding:12px 0;border-top:2px solid var(--ink);border-bottom:2px solid var(--ink)}
+.metric.total span{display:block;color:var(--ink);font-weight:700}
+.metric.total strong{display:block;font-size:clamp(1.5rem,5vw,1.9rem);line-height:1.25;white-space:nowrap}
+.lines.minor .metric:last-child{border-bottom:0}
+.good{color:var(--good)}
+.bad{color:var(--bad)}
+.result .actions{padding-top:12px;border-top:1px solid var(--line-soft)}
+.result .actions .danger{margin-left:auto}
+
+/* ===== スマホ：材料表をカード型にする ===== */
+@media screen and (max-width:720px){
+  .site-head{padding:20px 0 48px}
+  .wrap{padding:0 12px}
+  .panel{padding:14px}
+  .table-wrap{overflow:visible}
+  table,tbody,tr,td{display:block}
+  table{min-width:0}
+  thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)} /* 見出し行は視覚的に隠す（読み上げ用に残す） */
+  tbody tr{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 12px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fff}
+  tbody tr:focus-within{background:#f6f8fc}
+  td{padding:0;border:0}
+  td[data-label]::before{content:attr(data-label);display:block;margin-bottom:4px;color:var(--muted);font-size:.78rem;font-weight:650}
+  td input,td select{min-height:44px;padding:9px 10px;font-size:1rem}
+  td:nth-child(1) input,td:nth-child(n) input{min-width:0}
+  td:nth-child(2) input,td:nth-child(4) input,td:nth-child(6) input,td:nth-child(3) select,td:nth-child(5) select{min-width:0}
+  td:nth-child(1),td:nth-child(6){grid-column:1/-1}
+  td.count,td.subtotal{align-self:end;text-align:left;padding:8px 10px;background:#f5f8fc}
+  td.count{border-radius:8px 0 0 8px}
+  td.subtotal{text-align:right;border-radius:0 8px 8px 0}
+  td:last-child{grid-column:1/-1;text-align:right}
+  td .remove{min-height:40px}
+  .actions button{flex:1 1 auto}
+  .result .actions .danger{margin-left:0}
+}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ===== 印刷：常に表形式・操作ボタンは非表示 ===== */
+@media print{
+  body{background:#fff}
+  .site-head{padding:0 0 8px;background:none;color:#000}
+  .lead{color:#333}
+  .layout{display:block;margin-top:0;padding-bottom:0}
+  .panel{margin:0 0 12px;box-shadow:none;break-inside:avoid}
+  .result{position:static}
+  button,.actions,.empty-note{display:none!important}
+  input,select{min-height:0;border:0;padding:2px}
+  .with-unit .unit{border:0;background:none}
+}
 </style>
 </head>
-<body><main class="wrap">
+<body>
+<header class="site-head"><div class="wrap">
 <h1>学際 予算・売上計算アプリ</h1>
 <p class="lead">材料の必要量と商品の購入単位・単価から、購入パック数と材料費合計を自動計算します。</p>
-<section class="panel"><h2>販売・予算条件</h2><div class="grid">
-<div><label for="price">販売価格（円／杯）</label><input id="price" type="number" min="0" placeholder="例：300"></div>
-<div><label for="cups">販売予定数（杯）</label><input id="cups" type="number" min="0" placeholder="例：120"></div>
-<div><label for="serving">1杯あたり量（mL）</label><input id="serving" type="number" min="0" placeholder="例：150"></div>
-<div><label for="hours">販売時間（時間）</label><input id="hours" type="number" min="0" step=".5" placeholder="例：6"></div>
-<div><label for="budget">使える予算（円）</label><input id="budget" type="number" min="0" placeholder="例：15000"></div>
-<div><label for="other">その他費用（円）</label><input id="other" type="number" min="0" placeholder="例：500"></div>
-<div><label for="waste">予備費・ロス率（%）</label><input id="waste" type="number" min="0" max="100" placeholder="例：10"></div>
+</div></header>
+<main class="wrap layout">
+<div class="inputs">
+<section class="panel" aria-labelledby="h-cond"><h2 id="h-cond">販売・予算条件</h2><div class="grid">
+<div><label for="price">販売価格</label><div class="with-unit"><input id="price" type="number" inputmode="decimal" min="0" placeholder="例：300" aria-describedby="price-u"><span class="unit" id="price-u">円／杯</span></div></div>
+<div><label for="cups">販売予定数</label><div class="with-unit"><input id="cups" type="number" inputmode="decimal" min="0" placeholder="例：120" aria-describedby="cups-u"><span class="unit" id="cups-u">杯</span></div></div>
+<div><label for="serving">1杯あたり量</label><div class="with-unit"><input id="serving" type="number" inputmode="decimal" min="0" placeholder="例：150" aria-describedby="serving-u"><span class="unit" id="serving-u">mL</span></div></div>
+<div><label for="hours">販売時間</label><div class="with-unit"><input id="hours" type="number" inputmode="decimal" min="0" step=".5" placeholder="例：6" aria-describedby="hours-u"><span class="unit" id="hours-u">時間</span></div></div>
+<div><label for="budget">使える予算</label><div class="with-unit"><input id="budget" type="number" inputmode="decimal" min="0" placeholder="例：15000" aria-describedby="budget-u"><span class="unit" id="budget-u">円</span></div></div>
+<div><label for="other">その他費用</label><div class="with-unit"><input id="other" type="number" inputmode="decimal" min="0" placeholder="例：500" aria-describedby="other-u"><span class="unit" id="other-u">円</span></div></div>
+<div><label for="waste">予備費・ロス率</label><div class="with-unit"><input id="waste" type="number" inputmode="decimal" min="0" max="100" placeholder="例：10" aria-describedby="waste-u"><span class="unit" id="waste-u">%</span></div></div>
 </div></section>
-<section class="panel"><h2>材料・購入単位</h2>
+<section class="panel" aria-labelledby="h-mat"><h2 id="h-mat">材料・購入単位</h2>
 <p class="hint">「必要量」はレシピで使う量、「1購入単位の内容量」は1袋・1本・1パックなどに入っている量です。必要量に足りるよう購入単位を切り上げ、購入金額を計算します。gとkg、mLとLは自動換算します。</p>
-<div class="table-wrap"><table><thead><tr><th>材料名</th><th>必要量</th><th>単位</th><th>1購入単位の内容量</th><th>購入単位</th><th>単価（円／購入単位）</th><th>購入数</th><th>購入合計（円）</th><th></th></tr></thead><tbody id="materials"></tbody></table></div>
-<button id="add">＋ 材料を追加</button><button id="sample" class="secondary">サンプルを入力</button>
+<div class="table-wrap"><table><thead><tr><th>材料名</th><th>必要量</th><th>単位</th><th>1購入単位の内容量</th><th>購入単位</th><th>単価（円／購入単位）</th><th>購入数</th><th>購入合計（円）</th><th><span class="sr-only">操作</span></th></tr></thead><tbody id="materials"></tbody></table></div>
+<p class="empty-note">材料がまだありません。「＋ 材料を追加」で入力を始めるか、「サンプルを入力」で例を表示できます。</p>
+<div class="actions"><button id="add" class="primary" type="button">＋ 材料を追加</button><button id="sample" class="secondary" type="button">サンプルを入力</button></div>
 <div class="formula"><strong>計算例：</strong>必要量 2.5 kg、1袋 1 kg、単価 1,200円／袋 → 3袋購入、合計 3,600円</div>
 </section>
-<section class="panel"><h2>計算結果</h2><div class="cards">
+</div>
+<aside class="panel result" aria-labelledby="h-result"><h2 id="h-result">計算結果</h2>
+<div id="message" class="notice" data-state="idle" aria-live="polite"></div>
+<div class="lines">
 <div class="metric"><span>材料購入費合計</span><strong id="materialTotal">—</strong></div>
 <div class="metric"><span>予備費込み必要予算</span><strong id="required">—</strong></div>
 <div class="metric"><span>予算との差額</span><strong id="budgetDiff">—</strong></div>
 <div class="metric"><span>予定売上</span><strong id="revenue">—</strong></div>
-<div class="metric"><span>予想利益（売上−購入費等）</span><strong id="profit">—</strong></div>
+<div class="metric total"><span>予想利益（売上−購入費等）</span><strong id="profit">—</strong></div>
+</div>
+<div class="lines minor">
 <div class="metric"><span>1杯あたり費用（概算）</span><strong id="unitCost">—</strong></div>
 <div class="metric"><span>損益分岐点（杯）</span><strong id="breakEven">—</strong></div>
 <div class="metric"><span>必要な総量</span><strong id="volume">—</strong></div>
 <div class="metric"><span>目標販売ペース</span><strong id="pace">—</strong></div>
-</div><div id="message" class="notice" aria-live="polite"></div>
-<button id="exportJson">JSONファイルに保存</button><button id="importJson" class="secondary">JSONファイルを読み込む</button><input id="jsonFile" type="file" accept=".json,application/json" hidden><button id="print">印刷／PDF保存</button><button id="clear" class="secondary">入力をリセット</button>
-</section>
-<p class="hint">対応単位：重量（g・kg）、液体（mL・L）、個数（個・本・袋・セットなど）。個数系の単位は同じ単位同士で計算します。保存データはこの端末・ブラウザー内のみで、他の端末とは共有されません。</p>
+</div>
+<div class="actions"><button id="exportJson" class="secondary" type="button">JSONファイルに保存</button><button id="importJson" class="secondary" type="button">JSONファイルを読み込む</button><input id="jsonFile" type="file" accept=".json,application/json" hidden><button id="print" class="secondary" type="button">印刷／PDF保存</button><button id="clear" class="danger" type="button">入力をリセット</button></div>
+</aside>
+<p class="hint footnote">対応単位：重量（g・kg）、液体（mL・L）、個数（個・本・袋・セットなど）。個数系の単位は同じ単位同士で計算します。保存データはこの端末・ブラウザー内のみで、他の端末とは共有されません。</p>
 </main>
 <script>
 const $=id=>document.getElementById(id), yen=n=>Math.round(n).toLocaleString('ja-JP')+' 円';
@@ -55,7 +209,8 @@ const defaults=[
 function options(selected){return units.map(u=>'<option '+(u===selected?'selected':'')+' value="'+u+'">'+u+'</option>').join('')}
 function addRow(item={name:'',need:'',unit:'個',pack:'',packUnit:'個',price:''} ){
  const tr=document.createElement('tr');
- tr.innerHTML='<td><input aria-label="材料名"></td><td><input aria-label="必要量" type="number" min="0" step="any"></td><td><select aria-label="必要量の単位">'+options(item.unit)+'</select></td><td><input aria-label="購入単位の内容量" type="number" min="0.000001" step="any"></td><td><select aria-label="購入単位">'+options(item.packUnit)+'</select></td><td><input aria-label="単価" type="number" min="0" step="any"></td><td class="count">—</td><td class="subtotal">—</td><td><button class="danger remove" type="button">削除</button></td>';
+ // data-label はスマホ表示（カード型）で各欄の見出しとして使う
+ tr.innerHTML='<td data-label="材料名"><input aria-label="材料名"></td><td data-label="必要量"><input aria-label="必要量" type="number" inputmode="decimal" min="0" step="any"></td><td data-label="単位"><select aria-label="必要量の単位">'+options(item.unit)+'</select></td><td data-label="1購入単位の内容量"><input aria-label="購入単位の内容量" type="number" inputmode="decimal" min="0.000001" step="any"></td><td data-label="購入単位"><select aria-label="購入単位">'+options(item.packUnit)+'</select></td><td data-label="単価（円／購入単位）"><input aria-label="単価" type="number" inputmode="decimal" min="0" step="any"></td><td class="count" data-label="購入数">—</td><td class="subtotal" data-label="購入合計">—</td><td><button class="danger remove" type="button">削除</button></td>';
  const i=tr.querySelectorAll('input');i[0].value=item.name;i[1].value=item.need;i[2].value=item.pack;i[3].value=item.price;
  const s=tr.querySelectorAll('select');s[0].value=item.unit;s[1].value=item.packUnit;
  tr.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',calculate));
@@ -66,6 +221,15 @@ function factor(u){return ({g:1,kg:1000,mL:1,L:1000})[u]||null}
 function dimension(u){return ['g','kg'].includes(u)?'mass':['mL','L'].includes(u)?'volume':'count'}
 function rows(){return [...$('materials').rows].map(r=>{const i=r.querySelectorAll('input'),s=r.querySelectorAll('select');return {name:i[0].value,need:Math.max(0,+i[1].value||0),unit:s[0].value,pack:Math.max(0,+i[2].value||0),packUnit:s[1].value,price:Math.max(0,+i[3].value||0)}})}
 function val(id){return Math.max(0,+$(id).value||0)}
+// 結果欄のメッセージ帯の色分け用。state: idle / ok / warn / bad / info
+function setMessageState(state){
+ try{
+  const el=$('message');
+  if(el)el.dataset.state=state; // 要素が無い場合は何もしない
+ }catch(e){
+  console.error('メッセージ状態の更新に失敗しました:',e); // 表示が崩れるだけなので計算は止めない
+ }
+}
 function calculate(){
  const data=rows();
  const fieldIds=['price','cups','serving','hours','budget','other','waste'];
@@ -75,6 +239,7 @@ function calculate(){
   ['materialTotal','required','budgetDiff','revenue','profit','unitCost','breakEven','volume','pace'].forEach(id=>$(id).textContent='—');
   $('budgetDiff').className='';$('profit').className='';
   $('message').textContent='販売条件と材料を入力すると、計算結果がここに表示されます。';
+  setMessageState('idle');
   return;
  }
  let material=0,invalid=[];
@@ -86,11 +251,13 @@ function calculate(){
   const cost=count===null?0:count*r.price;
   if(count===null&&r.need>0)invalid.push(r.name||('材料'+(idx+1)));
   const tr=$('materials').rows[idx];tr.querySelector('.count').textContent=count===null?'単位を確認':count.toLocaleString('ja-JP')+' '+r.packUnit;tr.querySelector('.subtotal').textContent=count===null?'—':yen(cost);
+  tr.querySelector('.count').classList.toggle('bad',count===null&&r.need>0); // 必要量があるのに計算できない行だけ赤くする
   material+=cost;
  });
  const other=val('other'),waste=Math.min(100,val('waste'))/100,required=(material+other)*(1+waste),price=val('price'),cups=val('cups'),revenue=price*cups,cost=material+other,profit=revenue-cost,unitCost=cups?cost/cups:0,be=price>0?Math.ceil(cost/price):null,budget=val('budget'),diff=budget-required,serving=val('serving'),hours=val('hours');
  $('materialTotal').textContent=yen(material);$('required').textContent=yen(required);$('budgetDiff').textContent=(diff>=0?'+':'−')+yen(Math.abs(diff));$('budgetDiff').className=diff>=0?'good':'bad';$('revenue').textContent=yen(revenue);$('profit').textContent=(profit>=0?'+':'−')+yen(Math.abs(profit));$('profit').className=profit>=0?'good':'bad';$('unitCost').textContent=yen(unitCost);$('breakEven').textContent=be===null?'販売価格を入力':be.toLocaleString('ja-JP')+' 杯';$('volume').textContent=(serving*cups/1000).toLocaleString('ja-JP',{maximumFractionDigits:2})+' L';$('pace').textContent=hours>0?(cups/hours).toLocaleString('ja-JP',{maximumFractionDigits:1})+' 杯／時':'販売時間を入力';
  $('message').textContent=invalid.length?'単位または内容量を確認してください：'+invalid.join('、')+'。重量同士・液体同士は換算できます。個数系は必要量と購入単位を同じ単位にしてください。':diff<0?'予算を '+yen(-diff)+' 超過する見込みです。数量・単価・販売計画を見直してください。':profit<0?'予想では赤字です。販売価格・販売数・費用を見直してください。':'予算内の見込みです。購入数は必要量を満たすよう切り上げています。';
+ setMessageState(invalid.length?'warn':(diff<0||profit<0)?'bad':'ok');
  save()
 }
 function save(){ /* Do not automatically save input values in the browser. */ }
@@ -124,7 +291,8 @@ function importJsonFile(file){
    data.materials.forEach(m=>addRow({name:m.name,need:Number(m.need),unit:m.unit,pack:Number(m.pack),packUnit:m.packUnit,price:Number(m.price)}));
    calculate();
    $('message').textContent='JSONファイルを読み込み、入力内容を反映しました。';
-  }catch(e){alert('JSONファイルを読み込めませんでした。ファイル形式を確認してください。\\n'+e.message)}
+   setMessageState('idle');
+  }catch(e){alert('JSONファイルを読み込めませんでした。ファイル形式を確認してください。\n'+e.message)} // 以前は '\\n' で改行されず「\n」と表示されていたため修正
   finally{$('jsonFile').value=''}
  };
  reader.onerror=()=>{alert('ファイルを読み込めませんでした。');$('jsonFile').value=''};
