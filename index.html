@@ -93,8 +93,8 @@ function calculate(){
  $('message').textContent=invalid.length?'単位または内容量を確認してください：'+invalid.join('、')+'。重量同士・液体同士は換算できます。個数系は必要量と購入単位を同じ単位にしてください。':diff<0?'予算を '+yen(-diff)+' 超過する見込みです。数量・単価・販売計画を見直してください。':profit<0?'予想では赤字です。販売価格・販売数・費用を見直してください。':'予算内の見込みです。購入数は必要量を満たすよう切り上げています。';
  save()
 }
-function save(){ /* 入力内容をブラウザーに自動保存しない */ }
-function load(){ /* 初回表示は空欄。前回の入力内容は復元しない */ }
+function save(){ /* Do not automatically save input values in the browser. */ }
+function load(){ /* Start with a blank form; do not restore previous input values. */ }
 $('add').addEventListener('click',()=>{addRow();calculate()});
 $('sample').addEventListener('click',()=>{$('materials').innerHTML='';defaults.forEach(r=>addRow(r));calculate()});
 $('clear').addEventListener('click',()=>{['price','cups','serving','hours','budget','other','waste'].forEach(id=>$(id).value='');$('materials').innerHTML='';calculate()});
