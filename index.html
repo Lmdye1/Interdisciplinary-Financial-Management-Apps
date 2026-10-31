@@ -13,18 +13,18 @@
 <h1>学際 予算・売上計算アプリ</h1>
 <p class="lead">材料の必要量と商品の購入単位・単価から、購入パック数と材料費合計を自動計算します。</p>
 <section class="panel"><h2>販売・予算条件</h2><div class="grid">
-<div><label for="price">販売価格（円／杯）</label><input id="price" type="number" min="0" value="300"></div>
-<div><label for="cups">販売予定数（杯）</label><input id="cups" type="number" min="0" value="120"></div>
-<div><label for="serving">1杯あたり量（mL）</label><input id="serving" type="number" min="0" value="150"></div>
-<div><label for="hours">販売時間（時間）</label><input id="hours" type="number" min="0" step=".5" value="6"></div>
-<div><label for="budget">使える予算（円）</label><input id="budget" type="number" min="0" value="15000"></div>
-<div><label for="other">その他費用（円）</label><input id="other" type="number" min="0" value="0"></div>
-<div><label for="waste">予備費・ロス率（%）</label><input id="waste" type="number" min="0" max="100" value="10"></div>
+<div><label for="price">販売価格（円／杯）</label><input id="price" type="number" min="0" placeholder="例：300"></div>
+<div><label for="cups">販売予定数（杯）</label><input id="cups" type="number" min="0" placeholder="例：120"></div>
+<div><label for="serving">1杯あたり量（mL）</label><input id="serving" type="number" min="0" placeholder="例：150"></div>
+<div><label for="hours">販売時間（時間）</label><input id="hours" type="number" min="0" step=".5" placeholder="例：6"></div>
+<div><label for="budget">使える予算（円）</label><input id="budget" type="number" min="0" placeholder="例：15000"></div>
+<div><label for="other">その他費用（円）</label><input id="other" type="number" min="0" placeholder="例：500"></div>
+<div><label for="waste">予備費・ロス率（%）</label><input id="waste" type="number" min="0" max="100" placeholder="例：10"></div>
 </div></section>
 <section class="panel"><h2>材料・購入単位</h2>
 <p class="hint">「必要量」はレシピで使う量、「1購入単位の内容量」は1袋・1本・1パックなどに入っている量です。必要量に足りるよう購入単位を切り上げ、購入金額を計算します。gとkg、mLとLは自動換算します。</p>
 <div class="table-wrap"><table><thead><tr><th>材料名</th><th>必要量</th><th>単位</th><th>1購入単位の内容量</th><th>購入単位</th><th>単価（円／購入単位）</th><th>購入数</th><th>購入合計（円）</th><th></th></tr></thead><tbody id="materials"></tbody></table></div>
-<button id="add">＋ 材料を追加</button><button id="sample" class="secondary">サンプルに戻す</button>
+<button id="add">＋ 材料を追加</button><button id="sample" class="secondary">サンプルを入力</button>
 <div class="formula"><strong>計算例：</strong>必要量 2.5 kg、1袋 1 kg、単価 1,200円／袋 → 3袋購入、合計 3,600円</div>
 </section>
 <section class="panel"><h2>計算結果</h2><div class="cards">
@@ -53,7 +53,7 @@ const defaults=[
 {name:'容器・箸',need:120,unit:'個',pack:1,packUnit:'個',price:8}
 ];
 function options(selected){return units.map(u=>'<option '+(u===selected?'selected':'')+' value="'+u+'">'+u+'</option>').join('')}
-function addRow(item={name:'新しい材料',need:1,unit:'個',pack:1,packUnit:'個',price:0}){
+function addRow(item={name:'',need:'',unit:'個',pack:'',packUnit:'個',price:''} ){
  const tr=document.createElement('tr');
  tr.innerHTML='<td><input aria-label="材料名"></td><td><input aria-label="必要量" type="number" min="0" step="any"></td><td><select aria-label="必要量の単位">'+options(item.unit)+'</select></td><td><input aria-label="購入単位の内容量" type="number" min="0.000001" step="any"></td><td><select aria-label="購入単位">'+options(item.packUnit)+'</select></td><td><input aria-label="単価" type="number" min="0" step="any"></td><td class="count">—</td><td class="subtotal">—</td><td><button class="danger remove" type="button">削除</button></td>';
  const i=tr.querySelectorAll('input');i[0].value=item.name;i[1].value=item.need;i[2].value=item.pack;i[3].value=item.price;
@@ -67,7 +67,17 @@ function dimension(u){return ['g','kg'].includes(u)?'mass':['mL','L'].includes(u
 function rows(){return [...$('materials').rows].map(r=>{const i=r.querySelectorAll('input'),s=r.querySelectorAll('select');return {name:i[0].value,need:Math.max(0,+i[1].value||0),unit:s[0].value,pack:Math.max(0,+i[2].value||0),packUnit:s[1].value,price:Math.max(0,+i[3].value||0)}})}
 function val(id){return Math.max(0,+$(id).value||0)}
 function calculate(){
- const data=rows();let material=0,invalid=[];
+ const data=rows();
+ const fieldIds=['price','cups','serving','hours','budget','other','waste'];
+ const hasFieldInput=fieldIds.some(id=>$(id).value.trim()!=='');
+ const hasMaterialInput=data.some(r=>r.name.trim()!==''||String(r.need).trim()!==''||String(r.pack).trim()!==''||String(r.price).trim()!=='');
+ if(!hasFieldInput&&!hasMaterialInput){
+  ['materialTotal','required','budgetDiff','revenue','profit','unitCost','breakEven','volume','pace'].forEach(id=>$(id).textContent='—');
+  $('budgetDiff').className='';$('profit').className='';
+  $('message').textContent='販売条件と材料を入力すると、計算結果がここに表示されます。';
+  return;
+ }
+ let material=0,invalid=[];
  data.forEach((r,idx)=>{
   const sameDimension=dimension(r.unit)===dimension(r.packUnit);
   const needBase=factor(r.unit)!==null&&factor(r.packUnit)!==null?r.need*factor(r.unit):r.need;
@@ -83,11 +93,11 @@ function calculate(){
  $('message').textContent=invalid.length?'単位または内容量を確認してください：'+invalid.join('、')+'。重量同士・液体同士は換算できます。個数系は必要量と購入単位を同じ単位にしてください。':diff<0?'予算を '+yen(-diff)+' 超過する見込みです。数量・単価・販売計画を見直してください。':profit<0?'予想では赤字です。販売価格・販売数・費用を見直してください。':'予算内の見込みです。購入数は必要量を満たすよう切り上げています。';
  save()
 }
-function save(){try{localStorage.setItem('gakusaiBudgetAppV2',JSON.stringify({fields:['price','cups','serving','hours','budget','other','waste'].reduce((o,id)=>(o[id]=$(id).value,o),{}),materials:rows()}))}catch(e){}}
-function load(){try{const s=JSON.parse(localStorage.getItem('gakusaiBudgetAppV2'));if(s){Object.entries(s.fields||{}).forEach(([k,v])=>{if($(k))$(k).value=v});(s.materials||defaults).forEach(r=>addRow(r));return}}catch(e){}defaults.forEach(r=>addRow(r))}
+function save(){ /* 入力内容をブラウザーに自動保存しない */ }
+function load(){ /* 初回表示は空欄。前回の入力内容は復元しない */ }
 $('add').addEventListener('click',()=>{addRow();calculate()});
-$('sample').addEventListener('click',()=>{localStorage.removeItem('gakusaiBudgetAppV2');$('materials').innerHTML='';defaults.forEach(r=>addRow(r));calculate()});
-$('clear').addEventListener('click',()=>{if(!confirm('入力内容をリセットしますか？'))return;localStorage.removeItem('gakusaiBudgetAppV2');['price','cups','serving','hours','budget','other','waste'].forEach((id,i)=>$(id).value=[300,120,150,6,15000,0,10][i]);$('materials').innerHTML='';defaults.forEach(r=>addRow(r));calculate()});
+$('sample').addEventListener('click',()=>{$('materials').innerHTML='';defaults.forEach(r=>addRow(r));calculate()});
+$('clear').addEventListener('click',()=>{['price','cups','serving','hours','budget','other','waste'].forEach(id=>$(id).value='');$('materials').innerHTML='';calculate()});
 
 function exportJson(){
  const payload={app:'gakusai-budget-calculator',version:1,exportedAt:new Date().toISOString(),fields:['price','cups','serving','hours','budget','other','waste'].reduce((o,id)=>(o[id]=$(id).value,o),{}),materials:rows()};
