@@ -1,0 +1,11 @@
+{
+  "name": "interdisciplinary-financial-management-apps-tests",
+  "private": true,
+  "description": "学際予算・売上計算アプリのテスト実行環境",
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0"
+  }
+}
